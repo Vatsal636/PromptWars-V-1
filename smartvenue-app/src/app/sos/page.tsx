@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
+import { trackSOSUsage } from '@/lib/firebase/analytics';
 
 export default function SOSPage() {
   const [sosTriggered, setSosTriggered] = useState(false);
@@ -17,6 +18,7 @@ export default function SOSPage() {
   const confirmSOS = () => {
     setSosTriggered(true);
     setShowConfirm(false);
+    if (sosType) trackSOSUsage(sosType);
   };
 
   const cancelSOS = () => {

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import AIInsightBanner from '@/components/ui/AIInsightBanner';
+import { useVenueDataContext } from '@/lib/hooks/useLiveVenueData';
 import { useAIPolling } from '@/lib/hooks/useAIPolling';
 import { notifications as staticNotifications } from '@/data/mock-data';
 import { getNotificationColor } from '@/lib/utils';
@@ -18,21 +19,20 @@ interface AlertData {
   alerts: AIAlert[];
 }
 
-interface SimData {
-  simulation: { phase: string; phaseName: string; phaseProgress: number };
-}
-
 export default function NotificationsPage() {
   const [staticNotifs, setStaticNotifs] = useState(staticNotifications);
   const [filter, setFilter] = useState<'all' | 'ai-alerts' | 'unread' | 'info' | 'warning' | 'success' | 'emergency'>('all');
 
-  const { data: alertData, lastUpdate } = useAIPolling<AlertData>({ url: '/api/ai/alerts', interval: 3000 });
-  const { data: simData } = useAIPolling<SimData>({ url: '/api/ai/simulation', interval: 3000 });
+  // Shared venue context
+  const venue = useVenueDataContext();
+
+  // Additional alerts data for severity counts
+  const { data: alertData } = useAIPolling<AlertData>({ url: '/api/ai/alerts', interval: 3000 });
 
   const markAllRead = () => setStaticNotifs(prev => prev.map(n => ({ ...n, read: true })));
   const markRead = (id: string) => setStaticNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
 
-  const aiAlerts = alertData?.alerts || [];
+  const aiAlerts = alertData?.alerts || venue.alerts;
   const unreadCount = staticNotifs.filter(n => !n.read).length;
 
   const filteredStatic: Notification[] =
@@ -49,7 +49,7 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <PageHeader title="Notifications" subtitle="AI-generated alerts and real-time venue notifications" badge={`${aiAlerts.length + unreadCount} Active`} badgeColor={aiAlerts.length > 0 ? 'amber' : 'green'} />
 
-      {simData && <AIInsightBanner phase={simData.simulation.phase} phaseName={simData.simulation.phaseName} phaseProgress={simData.simulation.phaseProgress} lastUpdate={lastUpdate} />}
+      <AIInsightBanner phase={venue.phase} phaseName={venue.phaseName} phaseProgress={venue.phaseProgress} lastUpdate={venue.lastUpdate} />
 
       {/* AI Alert Summary */}
       {alertData && alertData.totalAlerts > 0 && (

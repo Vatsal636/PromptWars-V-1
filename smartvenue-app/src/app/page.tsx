@@ -4,25 +4,9 @@ import Link from 'next/link';
 import GlassCard from '@/components/ui/GlassCard';
 import StatCard from '@/components/ui/StatCard';
 import AIInsightBanner from '@/components/ui/AIInsightBanner';
-import { useAIPolling } from '@/lib/hooks/useAIPolling';
+import { useVenueDataContext } from '@/lib/hooks/useLiveVenueData';
+import { trackGateSelection } from '@/lib/firebase/analytics';
 import { currentEvent, userTicket } from '@/data/mock-data';
-import type { GateRecommendation } from '@/types';
-
-interface RecommendationData {
-  phase: string;
-  phaseName: string;
-  phaseProgress: number;
-  gates: {
-    recommended: GateRecommendation;
-    all: GateRecommendation[];
-  };
-  stats: {
-    crowdDensity: number;
-    avgWaitTime: number;
-    openGates: number;
-    totalAttendees: number;
-  };
-}
 
 const quickActions = [
   { href: '/crowd-monitor',  label: 'Live Crowd',     icon: '◎', desc: 'Real-time heatmap',   color: 'from-indigo-500 to-violet-600' },
@@ -33,27 +17,23 @@ const quickActions = [
 ];
 
 export default function HomePage() {
-  const { data, lastUpdate } = useAIPolling<RecommendationData>({
-    url: '/api/ai/recommendations',
-    interval: 3000,
-  });
+  // Shared venue data from context (no duplicate fetch)
+  const venue = useVenueDataContext();
 
-  const bestGate = data?.gates?.recommended;
-  const allGates = data?.gates?.all || [];
-  const stats = data?.stats;
+  const bestGate = venue.gateRecommendations.find(g => g.recommended);
+  const allGates = venue.gateRecommendations;
+  const stats = venue.stats;
 
   return (
     <div className="space-y-6">
 
       {/* ─── AI Engine Status ─── */}
-      {data && (
-        <AIInsightBanner
-          phase={data.phase}
-          phaseName={data.phaseName}
-          phaseProgress={data.phaseProgress}
-          lastUpdate={lastUpdate}
-        />
-      )}
+      <AIInsightBanner
+        phase={venue.phase}
+        phaseName={venue.phaseName}
+        phaseProgress={venue.phaseProgress}
+        lastUpdate={venue.lastUpdate}
+      />
 
       {/* ─── Hero Section ─── */}
       <GlassCard className="relative overflow-hidden" padding="lg">

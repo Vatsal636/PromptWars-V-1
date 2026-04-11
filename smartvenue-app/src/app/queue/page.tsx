@@ -4,27 +4,20 @@ import { useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import AIInsightBanner from '@/components/ui/AIInsightBanner';
-import { useAIPolling } from '@/lib/hooks/useAIPolling';
-import type { QueueStation, QueueToken, QueueRecommendation } from '@/types';
-
-interface SimData {
-  simulation: { phase: string; phaseName: string; phaseProgress: number };
-  queues: QueueStation[];
-  ai: { queueRecommendations: QueueRecommendation[] };
-}
+import { useVenueDataContext } from '@/lib/hooks/useLiveVenueData';
+import { trackQueueJoin } from '@/lib/firebase/analytics';
+import type { QueueStation, QueueToken } from '@/types';
 
 export default function QueuePage() {
   const [activeTab, setActiveTab] = useState<'all' | 'food' | 'restroom' | 'merchandise' | 'parking'>('all');
   const [tokens, setTokens] = useState<QueueToken[]>([]);
   const [joinAnimation, setJoinAnimation] = useState<string | null>(null);
 
-  const { data, lastUpdate } = useAIPolling<SimData>({
-    url: '/api/ai/simulation',
-    interval: 3000,
-  });
+  // Shared venue data from context (no duplicate fetch)
+  const venue = useVenueDataContext();
 
-  const stations = data?.queues || [];
-  const aiRecs = data?.ai?.queueRecommendations || [];
+  const stations = venue.queues;
+  const aiRecs = venue.queueRecommendations;
   const filtered = activeTab === 'all' ? stations : stations.filter(s => s.type === activeTab);
 
   const getAIRec = (stationId: string) => aiRecs.find(r => r.stationId === stationId);
@@ -42,6 +35,7 @@ export default function QueuePage() {
     };
     setTokens(prev => [token, ...prev]);
     setJoinAnimation(station.id);
+    trackQueueJoin(station.id, station.name, station.waitTime);
     setTimeout(() => setJoinAnimation(null), 1500);
   };
 
@@ -53,9 +47,7 @@ export default function QueuePage() {
     <div className="space-y-6">
       <PageHeader title="Queue Management" subtitle="AI-optimized virtual queues with predictive wait times and smart recommendations" badge="Active" badgeColor="green" />
 
-      {data && (
-        <AIInsightBanner phase={data.simulation.phase} phaseName={data.simulation.phaseName} phaseProgress={data.simulation.phaseProgress} lastUpdate={lastUpdate} />
-      )}
+      <AIInsightBanner phase={venue.phase} phaseName={venue.phaseName} phaseProgress={venue.phaseProgress} lastUpdate={venue.lastUpdate} />
 
       {/* AI Queue Recommendation */}
       {bestRec && (

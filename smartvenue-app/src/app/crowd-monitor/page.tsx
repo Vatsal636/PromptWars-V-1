@@ -4,9 +4,12 @@ import { useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import AIInsightBanner from '@/components/ui/AIInsightBanner';
+import VenueMap from '@/components/maps/VenueMap';
+import { useVenueDataContext } from '@/lib/hooks/useLiveVenueData';
 import { useAIPolling } from '@/lib/hooks/useAIPolling';
 import { getCrowdColor, getCrowdBg, getCrowdDot } from '@/lib/utils';
-import type { StadiumZone, CongestionPrediction } from '@/types';
+import { trackAlertView } from '@/lib/firebase/analytics';
+import type { CongestionPrediction } from '@/types';
 
 interface PredictionData {
   phase: string;
@@ -22,27 +25,21 @@ interface PredictionData {
   criticalWarnings: CongestionPrediction[];
 }
 
-interface SimData {
-  simulation: { phase: string; phaseName: string; phaseProgress: number };
-  zones: StadiumZone[];
-}
-
 export default function CrowdMonitorPage() {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'low' | 'moderate' | 'high' | 'critical'>('all');
 
-  const { data: predData, lastUpdate } = useAIPolling<PredictionData>({
+  // Shared venue data
+  const venue = useVenueDataContext();
+
+  // Additional predictions endpoint for detailed summary
+  const { data: predData } = useAIPolling<PredictionData>({
     url: '/api/ai/predictions',
     interval: 3000,
   });
 
-  const { data: simData } = useAIPolling<SimData>({
-    url: '/api/ai/simulation',
-    interval: 3000,
-  });
-
-  const zones = simData?.zones || [];
-  const predictions = predData?.zones || [];
+  const zones = venue.zones;
+  const predictions = predData?.zones || venue.predictions;
   const summary = predData?.summary;
   const criticalWarnings = predData?.criticalWarnings || [];
 
@@ -61,9 +58,7 @@ export default function CrowdMonitorPage() {
     <div className="space-y-6">
       <PageHeader title="Crowd Monitor" subtitle="AI-powered crowd density heatmap with predictive congestion analysis" badge="Live" badgeColor="green" />
 
-      {predData && simData && (
-        <AIInsightBanner phase={simData.simulation.phase} phaseName={simData.simulation.phaseName} phaseProgress={simData.simulation.phaseProgress} lastUpdate={lastUpdate} />
-      )}
+      <AIInsightBanner phase={venue.phase} phaseName={venue.phaseName} phaseProgress={venue.phaseProgress} lastUpdate={venue.lastUpdate} />
 
       {/* AI Prediction Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -97,12 +92,15 @@ export default function CrowdMonitorPage() {
             <span className="text-[9px] font-bold bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full uppercase">{criticalWarnings.length} zones</span>
           </div>
           <div className="space-y-2">
-            {criticalWarnings.map(w => (
-              <div key={w.zoneId} className="flex items-center gap-3 text-[12px]">
-                <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
-                <span className="text-gray-300">{w.recommendation}</span>
-              </div>
-            ))}
+            {criticalWarnings.map(w => {
+              trackAlertView(w.zoneId, w.warningLevel);
+              return (
+                <div key={w.zoneId} className="flex items-center gap-3 text-[12px]">
+                  <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
+                  <span className="text-gray-300">{w.recommendation}</span>
+                </div>
+              );
+            })}
           </div>
         </GlassCard>
       )}
@@ -116,48 +114,21 @@ export default function CrowdMonitorPage() {
         ))}
       </div>
 
-      {/* Stadium Visual Map */}
-      <GlassCard padding="lg">
-        <h3 className="text-sm font-bold text-white mb-4">Stadium Layout</h3>
-        <div className="relative aspect-[2/1] max-w-3xl mx-auto">
-          <div className="absolute inset-[5%] rounded-[50%] border-2 border-white/10" />
-          <div className="absolute inset-[15%] rounded-[50%] border border-white/[0.06]" />
-          <div className="absolute inset-[30%] rounded-[40%] bg-emerald-500/5 border border-emerald-500/15 flex items-center justify-center">
-            <span className="text-[11px] text-emerald-500/60 font-semibold uppercase tracking-wider">Field</span>
+      {/* Google Maps Crowd Heatmap */}
+      <GlassCard padding="md">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-white">🗺️ Crowd Heatmap</h3>
+            <span className="text-[9px] font-bold bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded-full uppercase border border-blue-500/20">Google Maps</span>
           </div>
-          {[
-            { id: 'z1', top: '8%', left: '40%' }, { id: 'z2', top: '82%', left: '40%' },
-            { id: 'z3', top: '40%', left: '82%' }, { id: 'z4', top: '40%', left: '5%' },
-            { id: 'z5', top: '25%', left: '78%' }, { id: 'z6', top: '25%', left: '10%' },
-            { id: 'z7', top: '5%', left: '18%' }, { id: 'z8', top: '78%', left: '68%' },
-          ].map(({ id, top, left }) => {
-            const zone = zones.find(z => z.id === id);
-            if (!zone) return null;
-            const pred = getPrediction(id);
-            return (
-              <button key={id} onClick={() => setSelectedZone(id)} className="absolute flex flex-col items-center gap-1 transition-all duration-300 hover:scale-110 cursor-pointer group" style={{ top, left }}>
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xs font-extrabold border transition-all ${getCrowdBg(zone.status)}`}>
-                  {zone.crowdPercentage}%
-                </div>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-gray-400 group-hover:text-white transition-colors whitespace-nowrap">{zone.name}</span>
-                {pred && (pred.trend === 'rising' || pred.trend === 'critical') && (
-                  <span className="text-[8px] font-bold text-red-400 animate-pulse">↑ rising</span>
-                )}
-              </button>
-            );
-          })}
         </div>
-        <div className="flex justify-center gap-4 mt-6 flex-wrap">
-          {[
-            { label: 'Low (<40%)', color: 'bg-emerald-500' }, { label: 'Moderate (40-65%)', color: 'bg-amber-500' },
-            { label: 'High (65-85%)', color: 'bg-orange-500' }, { label: 'Critical (>85%)', color: 'bg-red-500' },
-          ].map(l => (
-            <div key={l.label} className="flex items-center gap-1.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${l.color}`} />
-              <span className="text-[11px] text-gray-500">{l.label}</span>
-            </div>
-          ))}
-        </div>
+        <VenueMap
+          zones={zones}
+          alerts={venue.alerts}
+          showPOIs={['gates', 'seating']}
+          showHotspots={true}
+          height="300px"
+        />
       </GlassCard>
 
       {/* Zone List with AI Predictions */}
@@ -181,7 +152,6 @@ export default function CrowdMonitorPage() {
                   <span>{zone.crowdPercentage}% capacity</span>
                   <span>{zone.currentCount.toLocaleString()} / {zone.capacity.toLocaleString()}</span>
                 </div>
-                {/* AI Prediction row */}
                 {pred && (
                   <div className="mt-2 pt-2 border-t border-white/[0.04] flex items-center justify-between">
                     <span className="text-[10px] text-gray-500">AI Forecast</span>

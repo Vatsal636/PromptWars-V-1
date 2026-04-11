@@ -4,8 +4,11 @@ import { useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import AIInsightBanner from '@/components/ui/AIInsightBanner';
+import VenueMap from '@/components/maps/VenueMap';
+import { useVenueDataContext } from '@/lib/hooks/useLiveVenueData';
 import { useAIPolling } from '@/lib/hooks/useAIPolling';
-import { getCrowdBg, getCrowdColor } from '@/lib/utils';
+import { getCrowdBg } from '@/lib/utils';
+import { trackRouteRequest, trackNavigationStart } from '@/lib/firebase/analytics';
 import { navDestinations } from '@/data/mock-data';
 import type { NavDestination, RouteRecommendation } from '@/types';
 
@@ -22,19 +25,13 @@ interface RouteData {
   avgDensity: number;
 }
 
-interface SimData {
-  simulation: { phase: string; phaseName: string; phaseProgress: number };
-}
-
 export default function NavigationPage() {
   const [selectedDest, setSelectedDest] = useState<NavDestination | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<RouteRecommendation | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
 
-  const { data: simData, lastUpdate } = useAIPolling<SimData>({
-    url: '/api/ai/simulation',
-    interval: 3000,
-  });
+  // Shared venue data from context (no duplicate fetch)
+  const venue = useVenueDataContext();
 
   const destName = selectedDest?.name || 'My Seat';
   const { data: routeData } = useAIPolling<RouteData>({
@@ -49,6 +46,7 @@ export default function NavigationPage() {
   const startNavigation = (route: RouteRecommendation) => {
     setSelectedRoute(route);
     setIsNavigating(true);
+    trackNavigationStart(destName, route.label, route.time);
   };
 
   const stopNavigation = () => {
@@ -57,11 +55,18 @@ export default function NavigationPage() {
     setSelectedDest(null);
   };
 
+  const selectDestination = (dest: NavDestination) => {
+    setSelectedDest(dest);
+    setIsNavigating(false);
+    setSelectedRoute(null);
+    trackRouteRequest(dest.name, dest.type);
+  };
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Indoor Navigation" subtitle="AI-optimized routing inside the stadium — fastest, least crowded, and safest paths" badge="GPS Active" badgeColor="blue" />
+      <PageHeader title="Indoor Navigation" subtitle="AI-optimized routing with Google Maps — fastest, least crowded, and safest paths" badge="GPS Active" badgeColor="blue" />
 
-      {simData && <AIInsightBanner phase={simData.simulation.phase} phaseName={simData.simulation.phaseName} phaseProgress={simData.simulation.phaseProgress} lastUpdate={lastUpdate} />}
+      <AIInsightBanner phase={venue.phase} phaseName={venue.phaseName} phaseProgress={venue.phaseProgress} lastUpdate={venue.lastUpdate} />
 
       {/* Active Navigation Banner */}
       {isNavigating && selectedRoute && selectedDest && (
@@ -91,39 +96,43 @@ export default function NavigationPage() {
         </GlassCard>
       )}
 
-      {/* Map */}
+      {/* Google Maps Venue Map */}
       <GlassCard padding="md">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold text-white">Stadium Map</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-white">🗺️ Stadium Map</h3>
+            <span className="text-[9px] font-bold bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded-full uppercase border border-blue-500/20">Google Maps</span>
+          </div>
           {routeData && <span className="text-[10px] text-gray-500">Avg density: {routeData.avgDensity}%</span>}
         </div>
-        <div className="relative aspect-[16/8] rounded-xl bg-gradient-to-br from-gray-900/60 to-gray-800/30 border border-white/[0.04] overflow-hidden">
-          <div className="absolute inset-[8%] rounded-[45%] border-2 border-white/10">
-            <div className="absolute inset-[15%] rounded-[45%] border border-white/[0.06]" />
-            <div className="absolute inset-[30%] rounded-[30%] bg-emerald-500/8 border border-emerald-500/20 flex items-center justify-center">
-              <span className="text-xs text-emerald-500/50 font-semibold">Playing Field</span>
-            </div>
-          </div>
+        <VenueMap
+          zones={venue.zones}
+          alerts={venue.alerts}
+          gates={venue.gates}
+          showPOIs={['gates', 'food', 'restrooms', 'medical', 'exits']}
+          showHotspots={true}
+          selectedDestination={selectedDest?.name || null}
+          height="350px"
+        />
+      </GlassCard>
 
-          <div className="absolute top-[38%] right-[20%] flex flex-col items-center gap-1">
-            <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white shadow-lg shadow-indigo-500/40 animate-pulse" />
-            <span className="text-[9px] font-bold text-indigo-400 bg-gray-900/80 px-1.5 py-0.5 rounded">You</span>
-          </div>
-
+      {/* Route Stats Summary */}
+      {recommended && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: '🍕', top: '25%', left: '75%', name: 'Pizza Bay' },
-            { label: '🚻', top: '55%', left: '20%', name: 'Restroom' },
-            { label: '🚪', top: '80%', left: '50%', name: 'Exit Gate C' },
-            { label: '🏥', top: '15%', left: '35%', name: 'Medical' },
-            { label: '👕', top: '65%', left: '80%', name: 'Merch Store' },
-          ].map((poi) => (
-            <div key={poi.name} className="absolute flex flex-col items-center gap-0.5 cursor-pointer hover:scale-110 transition-transform" style={{ top: poi.top, left: poi.left }}>
-              <span className="text-lg">{poi.label}</span>
-              <span className="text-[8px] font-semibold text-gray-400 bg-gray-900/80 px-1 py-0.5 rounded whitespace-nowrap">{poi.name}</span>
-            </div>
+            { label: 'Recommended', value: recommended.label, sub: `${recommended.time} min`, color: 'text-indigo-400' },
+            { label: 'Density', value: `${recommended.crowdDensity}%`, sub: recommended.crowdDensity < 40 ? 'Low' : recommended.crowdDensity < 70 ? 'Moderate' : 'High', color: recommended.crowdDensity < 40 ? 'text-emerald-400' : recommended.crowdDensity < 70 ? 'text-amber-400' : 'text-red-400' },
+            { label: 'Safety Risk', value: `${recommended.safetyRisk}/10`, sub: recommended.safetyRisk <= 2 ? 'Very Safe' : recommended.safetyRisk <= 5 ? 'Moderate' : 'Caution', color: recommended.safetyRisk <= 2 ? 'text-emerald-400' : 'text-amber-400' },
+            { label: 'AI Score', value: recommended.score.toFixed(1), sub: 'Composite', color: 'text-violet-400' },
+          ].map(stat => (
+            <GlassCard key={stat.label} padding="md">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{stat.label}</p>
+              <p className={`text-lg font-extrabold ${stat.color}`}>{stat.value}</p>
+              <p className="text-[10px] text-gray-500">{stat.sub}</p>
+            </GlassCard>
           ))}
         </div>
-      </GlassCard>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Destinations */}
@@ -131,7 +140,7 @@ export default function NavigationPage() {
           <h3 className="text-sm font-bold text-white mb-3">Choose Destination</h3>
           <div className="space-y-2">
             {navDestinations.map((dest) => (
-              <button key={dest.id} onClick={() => { setSelectedDest(dest); setIsNavigating(false); setSelectedRoute(null); }} className="w-full text-left transition-all">
+              <button key={dest.id} onClick={() => selectDestination(dest)} className="w-full text-left transition-all">
                 <GlassCard padding="md" className={selectedDest?.id === dest.id ? 'ring-1 ring-indigo-500/40 bg-indigo-500/5' : ''}>
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{dest.icon}</span>
