@@ -48,6 +48,7 @@ export interface QueueToken {
   estimatedTime: number;
   status: 'waiting' | 'ready' | 'completed' | 'cancelled';
   position: number;
+  joinedAt?: number;
 }
 
 export interface NavDestination {

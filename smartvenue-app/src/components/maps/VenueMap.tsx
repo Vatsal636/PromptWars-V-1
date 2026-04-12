@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   VENUE_CENTER, VENUE_ZOOM, VENUE_POIS, type POIType,
   getDensityColor, getAlertMarkerColor, getZoneOverlays,
@@ -35,7 +35,7 @@ const MAP_STYLES = [
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ];
 
-export default function VenueMap({
+export default React.memo(function VenueMap({
   zones = [],
   alerts = [],
   gates = [],
@@ -86,6 +86,7 @@ export default function VenueMap({
       const map = new google.maps.Map(mapRef.current, {
         center: VENUE_CENTER,
         zoom: VENUE_ZOOM,
+        mapId: 'DEMO_MAP_ID',
         styles: MAP_STYLES,
         disableDefaultUI: true,
         zoomControl: true,
@@ -335,4 +336,4 @@ export default function VenueMap({
       </div>
     </div>
   );
-}
+});

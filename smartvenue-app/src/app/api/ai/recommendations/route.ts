@@ -7,28 +7,36 @@ import { tick } from '@/lib/simulation/liveDataSimulator';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const state = tick();
+  try {
+    const state = tick();
 
-  const bestGate = state.gateRecommendations.find(g => g.recommended) || state.gateRecommendations[0];
+    const bestGate = state.gateRecommendations.find(g => g.recommended) || state.gateRecommendations[0];
 
-  return NextResponse.json({
-    timestamp: new Date().toISOString(),
-    phase: state.phase,
-    phaseName: state.phaseName,
-    phaseProgress: state.phaseProgress,
-    gates: {
-      recommended: bestGate,
-      all: state.gateRecommendations,
-    },
-    queues: {
-      recommendations: state.queueRecommendations,
-      bestFood: state.queueRecommendations.find(q => q.recommended),
-    },
-    stats: {
-      crowdDensity: state.stats.crowdDensity,
-      avgWaitTime: state.stats.avgWaitTime,
-      openGates: state.stats.openGates,
-      totalAttendees: state.stats.totalAttendees,
-    },
-  });
+    return NextResponse.json({
+      success: true,
+      data: {
+        timestamp: new Date().toISOString(),
+        phase: state.phase,
+        phaseName: state.phaseName,
+        phaseProgress: state.phaseProgress,
+        gates: {
+          recommended: bestGate,
+          all: state.gateRecommendations,
+        },
+        queues: {
+          recommendations: state.queueRecommendations,
+          bestFood: state.queueRecommendations.find(q => q.recommended),
+        },
+        stats: {
+          crowdDensity: state.stats.crowdDensity,
+          avgWaitTime: state.stats.avgWaitTime,
+          openGates: state.stats.openGates,
+          totalAttendees: state.stats.totalAttendees,
+        },
+      }
+    });
+  } catch (error) {
+    console.error('[API Recommendations] Error:', error);
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+  }
 }

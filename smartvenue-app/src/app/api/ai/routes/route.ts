@@ -4,39 +4,58 @@
 import { NextResponse } from 'next/server';
 import { tick } from '@/lib/simulation/liveDataSimulator';
 import { generateRouteVariants, recommendRoutes } from '@/lib/ai/routeEngine';
+import { routeRequestSchema } from '@/lib/validation/schemas';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const destination = searchParams.get('destination') || 'My Seat';
+  try {
+    const { searchParams } = new URL(request.url);
+    const destinationRaw = searchParams.get('destination') || 'My Seat';
 
-  const state = tick();
+    // Validate request
+    const validated = routeRequestSchema.safeParse({ destination: destinationRaw });
+    if (!validated.success) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid destination parameter', details: validated.error.format() },
+        { status: 400 }
+      );
+    }
+    const destination = validated.data.destination;
 
-  // Build zone density map from live data
-  const zoneDensities: Record<string, number> = {};
-  state.zones.forEach(z => { zoneDensities[z.id] = z.crowdPercentage; });
+    const state = tick();
 
-  // Generate fresh route variants for this destination
-  const routeInputs = generateRouteVariants(destination, zoneDensities);
-  const recommendations = recommendRoutes(routeInputs);
+    // Build zone density map from live data
+    const zoneDensities: Record<string, number> = {};
+    state.zones.forEach(z => { zoneDensities[z.id] = z.crowdPercentage; });
 
-  const fastest = recommendations.find(r => r.type === 'fastest');
-  const leastCrowded = recommendations.find(r => r.type === 'least-crowded');
-  const safest = recommendations.find(r => r.type === 'safest');
-  const recommended = recommendations.find(r => r.recommended);
+    // Generate fresh route variants for this destination
+    const routeInputs = generateRouteVariants(destination, zoneDensities);
+    const recommendations = recommendRoutes(routeInputs);
 
-  return NextResponse.json({
-    timestamp: new Date().toISOString(),
-    phase: state.phase,
-    destination,
-    recommended,
-    routes: {
-      fastest,
-      leastCrowded,
-      safest,
-    },
-    all: recommendations,
-    avgDensity: state.stats.crowdDensity,
-  });
+    const fastest = recommendations.find(r => r.type === 'fastest');
+    const leastCrowded = recommendations.find(r => r.type === 'least-crowded');
+    const safest = recommendations.find(r => r.type === 'safest');
+    const recommended = recommendations.find(r => r.recommended);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        timestamp: new Date().toISOString(),
+        phase: state.phase,
+        destination,
+        recommended,
+        routes: {
+          fastest,
+          leastCrowded,
+          safest,
+        },
+        all: recommendations,
+        avgDensity: state.stats.crowdDensity,
+      }
+    });
+  } catch (error) {
+    console.error('[API Routes] Error:', error);
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+  }
 }

@@ -7,26 +7,34 @@ import { tick } from '@/lib/simulation/liveDataSimulator';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const state = tick();
+  try {
+    const state = tick();
 
-  return NextResponse.json({
-    timestamp: new Date().toISOString(),
-    simulation: {
-      phase: state.phase,
-      phaseName: state.phaseName,
-      phaseProgress: state.phaseProgress,
-      elapsedMinutes: state.elapsedMinutes,
-    },
-    stats: state.stats,
-    zones: state.zones,
-    queues: state.queues,
-    gates: state.gates,
-    ai: {
-      gateRecommendations: state.gateRecommendations,
-      queueRecommendations: state.queueRecommendations,
-      routeRecommendations: state.routeRecommendations,
-      predictions: state.predictions,
-      alerts: state.alerts,
-    },
-  });
+    return NextResponse.json({
+      success: true,
+      data: {
+        timestamp: new Date().toISOString(),
+        simulation: {
+          phase: state.phase,
+          phaseName: state.phaseName,
+          phaseProgress: state.phaseProgress,
+          elapsedMinutes: state.elapsedMinutes,
+        },
+        stats: state.stats,
+        zones: state.zones,
+        queues: state.queues,
+        gates: state.gates,
+        ai: {
+          gateRecommendations: state.gateRecommendations,
+          queueRecommendations: state.queueRecommendations,
+          routeRecommendations: state.routeRecommendations,
+          predictions: state.predictions,
+          alerts: state.alerts,
+        },
+      }
+    });
+  } catch (error) {
+    console.error('[API Simulation] Error:', error);
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+  }
 }

@@ -1,14 +1,14 @@
 import { cn } from '@/lib/utils';
 import { ReactNode } from 'react';
 
-interface GlassCardProps {
+interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   className?: string;
   hover?: boolean;
   padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
-export default function GlassCard({ children, className, hover = true, padding = 'md' }: GlassCardProps) {
+export default function GlassCard({ children, className, hover = true, padding = 'md', ...props }: GlassCardProps) {
   const paddings = {
     none: '',
     sm: 'p-4',
@@ -18,6 +18,7 @@ export default function GlassCard({ children, className, hover = true, padding =
 
   return (
     <div
+      {...props}
       className={cn(
         'rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm',
         hover && 'transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.1] hover:shadow-lg hover:shadow-black/20',

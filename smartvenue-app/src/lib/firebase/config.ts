@@ -17,10 +17,16 @@ const firebaseConfig = {
  * Get or initialize the Firebase app singleton.
  * Prevents re-initialization in Next.js hot-reload / serverless environments.
  */
-export function getFirebaseApp(): FirebaseApp {
+export function getFirebaseApp(): FirebaseApp | null {
   if (getApps().length > 0) {
     return getApp();
   }
+  
+  if (firebaseConfig.apiKey.includes('your-') || firebaseConfig.apiKey.includes('demo-')) {
+    console.warn('Firebase initialized with dummy keys. Sync and Analytics disabled.');
+    return null;
+  }
+  
   return initializeApp(firebaseConfig);
 }
 

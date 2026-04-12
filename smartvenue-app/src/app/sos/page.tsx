@@ -38,11 +38,11 @@ export default function SOSPage() {
 
       {/* SOS Triggered State */}
       {sosTriggered && (
-        <GlassCard padding="lg" className="border-red-500/30 bg-red-500/5 relative overflow-hidden">
+        <GlassCard padding="lg" className="border-red-500/30 bg-red-500/5 relative overflow-hidden" role="alert" aria-live="assertive">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500 animate-pulse" />
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500/40 flex items-center justify-center mx-auto mb-4 animate-pulse">
-              <span className="text-3xl">🆘</span>
+              <span className="text-3xl" aria-hidden="true">🆘</span>
             </div>
             <h3 className="text-xl font-extrabold text-red-400 mb-2">SOS Alert Sent</h3>
             <p className="text-sm text-gray-400 mb-1">
@@ -67,7 +67,8 @@ export default function SOSPage() {
 
             <button
               onClick={cancelSOS}
-              className="px-6 py-2.5 text-sm font-semibold rounded-lg border border-red-500/25 text-red-400 hover:bg-red-500/15 transition-all"
+              autoFocus
+              className="px-6 py-2.5 text-sm font-semibold rounded-lg border border-red-500/25 text-red-400 hover:bg-red-500/15 transition-all focus:outline-none focus:ring-2 focus:ring-red-400"
             >
               Cancel SOS
             </button>
@@ -77,30 +78,33 @@ export default function SOSPage() {
 
       {/* Confirmation Modal */}
       {showConfirm && (
-        <GlassCard padding="lg" className="border-amber-500/25">
-          <div className="text-center">
-            <span className="text-4xl block mb-3">⚠️</span>
-            <h3 className="text-lg font-extrabold text-white mb-2">Confirm Emergency Alert</h3>
-            <p className="text-sm text-gray-400 mb-4">
-              Are you sure you want to send a <span className="font-semibold text-amber-400 capitalize">{sosType}</span> emergency alert?
-              This will immediately dispatch help to your location.
-            </p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={confirmSOS}
-                className="px-6 py-2.5 text-sm font-bold rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all shadow-lg shadow-red-500/25"
-              >
-                Yes, Send SOS
-              </button>
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="px-6 py-2.5 text-sm font-semibold rounded-lg border border-white/[0.1] text-gray-400 hover:text-white hover:bg-white/[0.04] transition-all"
-              >
-                Cancel
-              </button>
+        <div role="dialog" aria-modal="true" aria-labelledby="sos-confirm-title" className="relative z-50">
+          <GlassCard padding="lg" className="border-amber-500/25">
+            <div className="text-center">
+              <span className="text-4xl block mb-3" aria-hidden="true">⚠️</span>
+              <h3 id="sos-confirm-title" className="text-lg font-extrabold text-white mb-2">Confirm Emergency Alert</h3>
+              <p className="text-sm text-gray-400 mb-4">
+                Are you sure you want to send a <span className="font-semibold text-amber-400 capitalize">{sosType}</span> emergency alert?
+                This will immediately dispatch help to your location.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={confirmSOS}
+                  autoFocus
+                  className="px-6 py-2.5 text-sm font-bold rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all shadow-lg shadow-red-500/25 focus:outline-none focus:ring-2 focus:ring-red-400"
+                >
+                  Yes, Send SOS
+                </button>
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="px-6 py-2.5 text-sm font-semibold rounded-lg border border-white/[0.1] text-gray-400 hover:text-white hover:bg-white/[0.04] transition-all focus:outline-none focus:ring-2 focus:ring-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        </GlassCard>
+          </GlassCard>
+        </div>
       )}
 
       {/* Main SOS Button */}
@@ -108,7 +112,8 @@ export default function SOSPage() {
         <div className="flex justify-center py-4">
           <button
             onClick={() => triggerSOS('general')}
-            className="relative group"
+            className="relative group focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-offset-4 focus:ring-offset-[#07070d] rounded-full"
+            aria-label="Trigger General Emergency SOS"
           >
             {/* Ripple rings */}
             <div className="absolute inset-0 w-44 h-44 rounded-full border-2 border-red-500/20 animate-ping" />
@@ -116,7 +121,7 @@ export default function SOSPage() {
             {/* Button */}
             <div className="w-44 h-44 rounded-full bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-2xl shadow-red-500/30 group-hover:shadow-red-500/50 group-hover:scale-105 transition-all duration-300 relative">
               <div className="text-center">
-                <span className="text-5xl block mb-1">🆘</span>
+                <span className="text-5xl block mb-1" aria-hidden="true">🆘</span>
                 <span className="text-sm font-extrabold text-white uppercase tracking-wider">SOS</span>
               </div>
             </div>

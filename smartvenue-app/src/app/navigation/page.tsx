@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import AIInsightBanner from '@/components/ui/AIInsightBanner';
@@ -30,6 +30,39 @@ export default function NavigationPage() {
   const [selectedRoute, setSelectedRoute] = useState<RouteRecommendation | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
 
+  // Restore active navigation state immediately on mount
+  useEffect(() => {
+    const savedDest = sessionStorage.getItem('smartvenue_nav_dest');
+    const savedRoute = sessionStorage.getItem('smartvenue_nav_route');
+    const savedIsNavigating = sessionStorage.getItem('smartvenue_nav_active');
+
+    if (savedDest) setSelectedDest(JSON.parse(savedDest));
+    if (savedRoute) setSelectedRoute(JSON.parse(savedRoute));
+    if (savedIsNavigating === 'true') setIsNavigating(true);
+  }, []);
+
+  const persistState = (dest: NavDestination | null, route: RouteRecommendation | null, isNav: boolean) => {
+    if (dest) sessionStorage.setItem('smartvenue_nav_dest', JSON.stringify(dest));
+    else sessionStorage.removeItem('smartvenue_nav_dest');
+
+    if (route) sessionStorage.setItem('smartvenue_nav_route', JSON.stringify(route));
+    else sessionStorage.removeItem('smartvenue_nav_route');
+
+    sessionStorage.setItem('smartvenue_nav_active', isNav.toString());
+  };
+
+  const handleSelectDest = (dest: NavDestination | null) => {
+    setSelectedDest(dest);
+    persistState(dest, selectedRoute, isNavigating);
+  };
+
+  const stopNavigation = () => {
+    setIsNavigating(false);
+    setSelectedRoute(null);
+    setSelectedDest(null);
+    persistState(null, null, false);
+  };
+
   // Shared venue data from context (no duplicate fetch)
   const venue = useVenueDataContext();
 
@@ -46,14 +79,11 @@ export default function NavigationPage() {
   const startNavigation = (route: RouteRecommendation) => {
     setSelectedRoute(route);
     setIsNavigating(true);
+    persistState(selectedDest, route, true);
     trackNavigationStart(destName, route.label, route.time);
   };
 
-  const stopNavigation = () => {
-    setIsNavigating(false);
-    setSelectedRoute(null);
-    setSelectedDest(null);
-  };
+
 
   const selectDestination = (dest: NavDestination) => {
     setSelectedDest(dest);

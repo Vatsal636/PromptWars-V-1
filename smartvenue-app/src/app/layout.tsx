@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
 import VenueProvider from "@/components/providers/VenueProvider";
+import GlobalQueueEngine from "@/components/ui/GlobalQueueEngine";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -15,18 +16,21 @@ export const metadata: Metadata = {
   description: "Real-time venue intelligence platform for stadiums. Optimize crowd movement, reduce waiting times, and enhance attendee experience with AI and IoT.",
 };
 
+import { env } from "@/lib/env";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  const mapsApiKey = env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  const hasValidMapKey = mapsApiKey && !mapsApiKey.includes('your-') && !mapsApiKey.includes('demo-');
 
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-sans antialiased bg-[#07070d] text-gray-100 min-h-screen`}>
         {/* Google Maps JavaScript API */}
-        {mapsApiKey && (
+        {hasValidMapKey && (
           <Script
             src={`https://maps.googleapis.com/maps/api/js?key=${mapsApiKey}&libraries=places,marker&v=weekly`}
             strategy="afterInteractive"
@@ -40,6 +44,7 @@ export default function RootLayout({
         </div>
 
         <VenueProvider>
+          <GlobalQueueEngine />
           <Sidebar />
 
           {/* Main Content Area */}

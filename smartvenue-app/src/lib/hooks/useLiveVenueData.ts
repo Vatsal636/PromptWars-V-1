@@ -111,7 +111,8 @@ export function useLiveVenueData(interval = 3000): VenueData {
     try {
       const res = await fetch('/api/ai/simulation', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+      const payload = await res.json();
+      const json = payload.success ? payload.data : payload;
 
       if (!mountedRef.current) return;
 

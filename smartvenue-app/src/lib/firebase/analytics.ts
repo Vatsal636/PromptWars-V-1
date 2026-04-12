@@ -19,6 +19,7 @@ async function getAnalyticsInstance(): Promise<Analytics | null> {
 
   try {
     const app = getFirebaseApp();
+    if (!app) return null;
     analyticsInstance = getAnalytics(app);
     return analyticsInstance;
   } catch {

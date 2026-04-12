@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import AIInsightBanner from '@/components/ui/AIInsightBanner';
@@ -16,6 +16,23 @@ export default function QueuePage() {
   // Shared venue data from context (no duplicate fetch)
   const venue = useVenueDataContext();
 
+  // Poll persistent queue tokens constantly to sync with global countdown
+  useEffect(() => {
+    const syncFromStorage = () => {
+      const saved = localStorage.getItem('smartvenue_queue_tokens');
+      if (saved) {
+        setTokens(JSON.parse(saved));
+      }
+    };
+    
+    // Initial load
+    syncFromStorage();
+
+    // Poll every 1s so the UI strictly reflects the GlobalQueueEngine logic
+    const interval = setInterval(syncFromStorage, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const stations = venue.queues;
   const aiRecs = venue.queueRecommendations;
   const filtered = activeTab === 'all' ? stations : stations.filter(s => s.type === activeTab);
@@ -24,22 +41,38 @@ export default function QueuePage() {
 
   const joinQueue = (station: QueueStation) => {
     const rec = getAIRec(station.id);
+    const timeToWait = rec?.predictedWait ?? station.waitTime;
+    const isInstant = timeToWait <= 0;
+
     const token: QueueToken = {
       id: `tkn-${Date.now()}`,
       stationId: station.id,
       stationName: station.name,
       tokenNumber: `A-${String(Math.floor(Math.random() * 999)).padStart(3, '0')}`,
-      estimatedTime: rec?.predictedWait ?? station.waitTime,
-      status: 'waiting',
-      position: Math.floor(Math.random() * 10) + 1,
+      estimatedTime: isInstant ? 0 : timeToWait,
+      status: isInstant ? 'ready' : 'waiting',
+      position: isInstant ? 0 : Math.floor(Math.random() * 10) + 1,
+      joinedAt: Date.now(),
     };
-    setTokens(prev => [token, ...prev]);
+    
+    setTokens(prev => {
+      const next = [token, ...prev];
+      localStorage.setItem('smartvenue_queue_tokens', JSON.stringify(next));
+      return next;
+    });
+
     setJoinAnimation(station.id);
     trackQueueJoin(station.id, station.name, station.waitTime);
     setTimeout(() => setJoinAnimation(null), 1500);
   };
 
-  const cancelToken = (tokenId: string) => setTokens(prev => prev.filter(t => t.id !== tokenId));
+  const cancelToken = (tokenId: string) => {
+    setTokens(prev => {
+      const next = prev.filter(t => t.id !== tokenId);
+      localStorage.setItem('smartvenue_queue_tokens', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const bestRec = aiRecs.find(r => r.recommended);
 
@@ -78,20 +111,37 @@ export default function QueuePage() {
           <h3 className="text-sm font-bold text-white mb-3">Your Active Tokens</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {tokens.map((token) => (
-              <GlassCard key={token.id} padding="md" className="border-indigo-500/20 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+              <GlassCard key={token.id} padding="md" className={`border-indigo-500/20 relative overflow-hidden ${token.status === 'ready' ? 'ring-1 ring-emerald-500/50 bg-emerald-500/5' : ''}`}>
+                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${token.status === 'ready' ? 'from-emerald-500 to-teal-500' : 'from-indigo-500 to-violet-500'}`} />
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="text-sm font-bold text-white">{token.stationName}</p>
                     <p className="text-[11px] text-gray-500 mt-0.5">Token #{token.tokenNumber}</p>
                   </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 capitalize">{token.status}</span>
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border capitalize ${token.status === 'ready' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'}`}>
+                    {token.status}
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div><p className="text-[10px] text-gray-500 uppercase tracking-wider">Position</p><p className="text-lg font-extrabold text-white">#{token.position}</p></div>
-                  <div><p className="text-[10px] text-gray-500 uppercase tracking-wider">AI Est. Wait</p><p className="text-lg font-extrabold text-amber-400">{token.estimatedTime} min</p></div>
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">{token.status === 'ready' ? 'Action' : 'Position'}</p>
+                    <p className={`text-lg font-extrabold ${token.status === 'ready' ? 'text-emerald-400' : 'text-white'}`}>
+                      {token.status === 'ready' ? 'Proceed' : `#${token.position}`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">AI Est. Wait</p>
+                    <p className={`text-lg font-extrabold ${token.status === 'ready' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {token.estimatedTime} min
+                    </p>
+                  </div>
                 </div>
-                <button onClick={() => cancelToken(token.id)} className="w-full py-2 text-[12px] font-semibold rounded-lg border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all">Cancel Token</button>
+                <button 
+                  onClick={() => cancelToken(token.id)} 
+                  className={`w-full py-2 text-[12px] font-semibold rounded-lg border transition-all ${token.status === 'ready' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30' : 'border-red-500/20 text-red-400 hover:bg-red-500/10'}`}
+                >
+                  {token.status === 'ready' ? 'Done' : 'Cancel Token'}
+                </button>
               </GlassCard>
             ))}
           </div>

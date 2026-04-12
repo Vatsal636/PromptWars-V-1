@@ -22,9 +22,10 @@ let firestoreInstance: Firestore | null = null;
 /**
  * Get or initialize Firestore instance.
  */
-export function getFirestoreDb(): Firestore {
+export function getFirestoreDb(): Firestore | null {
   if (!firestoreInstance) {
     const app = getFirebaseApp();
+    if (!app) return null;
     firestoreInstance = getFirestore(app);
   }
   return firestoreInstance;
@@ -44,8 +45,10 @@ export const COLLECTIONS = {
 /**
  * Get typed collection reference.
  */
-export function getCollection(name: string): CollectionReference<DocumentData> {
-  return collection(getFirestoreDb(), name);
+export function getCollection(name: string): CollectionReference<DocumentData> | null {
+  const db = getFirestoreDb();
+  if (!db) return null;
+  return collection(db, name);
 }
 
 // ─── Data Seeding ───
@@ -55,6 +58,7 @@ export function getCollection(name: string): CollectionReference<DocumentData> {
  */
 export async function seedCrowdZones(zones: StadiumZone[]): Promise<void> {
   const db = getFirestoreDb();
+  if (!db) return;
   for (const zone of zones) {
     await setDoc(doc(db, COLLECTIONS.CROWD_ZONES, zone.id), {
       ...zone,
@@ -68,6 +72,7 @@ export async function seedCrowdZones(zones: StadiumZone[]): Promise<void> {
  */
 export async function seedQueues(stations: QueueStation[]): Promise<void> {
   const db = getFirestoreDb();
+  if (!db) return;
   for (const station of stations) {
     await setDoc(doc(db, COLLECTIONS.QUEUES, station.id), {
       ...station,
@@ -81,6 +86,7 @@ export async function seedQueues(stations: QueueStation[]): Promise<void> {
  */
 export async function seedAlerts(alerts: AIAlert[]): Promise<void> {
   const db = getFirestoreDb();
+  if (!db) return;
   for (const alert of alerts) {
     await setDoc(doc(db, COLLECTIONS.ALERTS, alert.id), {
       ...alert,
@@ -94,6 +100,7 @@ export async function seedAlerts(alerts: AIAlert[]): Promise<void> {
  */
 export async function seedIncidents(incidents: Incident[]): Promise<void> {
   const db = getFirestoreDb();
+  if (!db) return;
   for (const incident of incidents) {
     await setDoc(doc(db, COLLECTIONS.INCIDENTS, incident.id), {
       ...incident,
@@ -107,6 +114,7 @@ export async function seedIncidents(incidents: Incident[]): Promise<void> {
  */
 export async function seedGates(gates: GateData[]): Promise<void> {
   const db = getFirestoreDb();
+  if (!db) return;
   for (const gate of gates) {
     await setDoc(doc(db, COLLECTIONS.GATES, gate.id), {
       ...gate,
@@ -120,6 +128,7 @@ export async function seedGates(gates: GateData[]): Promise<void> {
  */
 export async function updateVenueStats(stats: Record<string, unknown>): Promise<void> {
   const db = getFirestoreDb();
+  if (!db) return;
   await setDoc(doc(db, COLLECTIONS.VENUE_STATS, 'current'), {
     ...stats,
     updatedAt: Date.now(),
@@ -134,7 +143,9 @@ export async function updateVenueStats(stats: Record<string, unknown>): Promise<
 export function subscribeCrowdZones(
   callback: (zones: StadiumZone[]) => void
 ): Unsubscribe {
-  const q = query(getCollection(COLLECTIONS.CROWD_ZONES));
+  const col = getCollection(COLLECTIONS.CROWD_ZONES);
+  if (!col) return () => {};
+  const q = query(col);
   return onSnapshot(q, (snapshot) => {
     const zones: StadiumZone[] = [];
     snapshot.forEach((doc) => {
@@ -150,7 +161,9 @@ export function subscribeCrowdZones(
 export function subscribeQueues(
   callback: (queues: QueueStation[]) => void
 ): Unsubscribe {
-  const q = query(getCollection(COLLECTIONS.QUEUES));
+  const col = getCollection(COLLECTIONS.QUEUES);
+  if (!col) return () => {};
+  const q = query(col);
   return onSnapshot(q, (snapshot) => {
     const queues: QueueStation[] = [];
     snapshot.forEach((doc) => {
@@ -166,7 +179,9 @@ export function subscribeQueues(
 export function subscribeAlerts(
   callback: (alerts: AIAlert[]) => void
 ): Unsubscribe {
-  const q = query(getCollection(COLLECTIONS.ALERTS));
+  const col = getCollection(COLLECTIONS.ALERTS);
+  if (!col) return () => {};
+  const q = query(col);
   return onSnapshot(q, (snapshot) => {
     const alerts: AIAlert[] = [];
     snapshot.forEach((doc) => {
@@ -182,7 +197,9 @@ export function subscribeAlerts(
 export function subscribeIncidents(
   callback: (incidents: Incident[]) => void
 ): Unsubscribe {
-  const q = query(getCollection(COLLECTIONS.INCIDENTS));
+  const col = getCollection(COLLECTIONS.INCIDENTS);
+  if (!col) return () => {};
+  const q = query(col);
   return onSnapshot(q, (snapshot) => {
     const incidents: Incident[] = [];
     snapshot.forEach((doc) => {
